@@ -1,4 +1,5 @@
 """运行配置：全部可通过环境变量覆盖。"""
+
 from __future__ import annotations
 
 import os
@@ -21,6 +22,13 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR / "var"))).resolve()
 SEED_DIR = Path(os.environ.get("SEED_DIR", str(BASE_DIR / "seed"))).resolve()
 DB_PATH = Path(os.environ.get("DB_PATH", str(DATA_DIR / "datalake.db"))).resolve()
 PARTITIONS_SUBDIR = "partitions"
+# 补传文件先写到独立的 staging 目录，发布事务只做原子 rename，不在接收/写文件期间持写锁
+STAGING_SUBDIR = "staging"
+# 单个补传 JSONL 的最大字节数（1 MiB）
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(1024 * 1024)))
+# staging 中未被发布的残留文件超过该时长后可在启动时清理（远大于单次上传耗时，
+# 避免误删另一进程正在进行的上传）
+STAGING_TTL_SECONDS = float(os.environ.get("STAGING_TTL_SECONDS", "3600"))
 
 # 后台清理循环间隔（秒）
 CLEANUP_INTERVAL_SECONDS = float(os.environ.get("CLEANUP_INTERVAL_SECONDS", "15"))
@@ -34,7 +42,9 @@ CLEANUP_MAX_PER_PASS = int(os.environ.get("CLEANUP_MAX_PER_PASS", "100"))
 BACKGROUND_CLEANUP_ENABLED = _flag("BACKGROUND_CLEANUP_ENABLED", True)
 # 故障注入（仅用于演示/测试删除失败路径）：逗号分隔的分区号，删除这些分区时抛出 OSError
 DELETE_FAIL_PARTITIONS = {
-    x.strip() for x in os.environ.get("DELETE_FAIL_PARTITIONS", "").split(",") if x.strip()
+    x.strip()
+    for x in os.environ.get("DELETE_FAIL_PARTITIONS", "").split(",")
+    if x.strip()
 }
 
 PROCESS_NAME = os.environ.get("PROCESS_NAME") or socket.gethostname()
